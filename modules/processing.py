@@ -1,6 +1,8 @@
 from PIL import Image, ImageFilter
 import torch
 import math
+
+import execution_context
 from nodes import common_ksampler, VAEEncode, VAEDecode, VAEDecodeTiled
 from comfy_extras.nodes_custom_sampler import SamplerCustom
 from utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond
@@ -14,6 +16,7 @@ class StableDiffusionProcessing:
 
     def __init__(
         self,
+        context: execution_context.ExecutionContext,
         init_img,
         model,
         positive,
@@ -70,6 +73,8 @@ class StableDiffusionProcessing:
         # Other required A1111 variables for the USDU script that is currently unused in this script
         self.extra_generation_params = {}
 
+        self.context = context
+
 
 class Processed:
 
@@ -86,7 +91,7 @@ def fix_seed(p: StableDiffusionProcessing):
     pass
 
 
-def sample(model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent, denoise, custom_sampler, custom_sigmas):
+def sample(context: execution_context.ExecutionContext, model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent, denoise, custom_sampler, custom_sigmas):
     # Choose way to sample based on given inputs
 
     # Custom sampler and sigmas
@@ -106,7 +111,7 @@ def sample(model, seed, steps, cfg, sampler_name, scheduler, positive, negative,
         return samples
 
     # Default
-    (samples,) = common_ksampler(model, seed, steps, cfg, sampler_name,
+    (samples,) = common_ksampler(context, model, seed, steps, cfg, sampler_name,
                                  scheduler, positive, negative, latent, denoise=denoise)
     return samples
 
@@ -170,7 +175,7 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     (latent,) = p.vae_encoder.encode(p.vae, batched_tiles)
 
     # Generate samples
-    samples = sample(p.model, p.seed, p.steps, p.cfg, p.sampler_name, p.scheduler, positive_cropped,
+    samples = sample(p.context, p.model, p.seed, p.steps, p.cfg, p.sampler_name, p.scheduler, positive_cropped,
                      negative_cropped, latent, p.denoise, p.custom_sampler, p.custom_sigmas)
 
     # Decode the sample
