@@ -11,6 +11,8 @@ from enum import Enum
 import json
 import os
 
+import execution_context
+
 if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
     Image.Resampling = Image
 
@@ -30,6 +32,7 @@ class StableDiffusionProcessing:
 
     def __init__(
         self,
+        context: execution_context.ExecutionContext,
         init_img,
         model,
         positive,
@@ -95,6 +98,8 @@ class StableDiffusionProcessing:
         # Other required A1111 variables for the USDU script that is currently unused in this script
         self.extra_generation_params = {}
 
+        self.context = context
+
         # Load config file for USDU
         config_path = os.path.join(os.path.dirname(__file__), os.pardir, 'config.json')
         config = {}
@@ -123,7 +128,7 @@ class StableDiffusionProcessing:
         # Undo changes to progress bar flag when node is done or cancelled
         if self.progress_bar_enabled:
             comfy.utils.PROGRESS_BAR_ENABLED = True
-    
+
 class Processed:
 
     def __init__(self, p: StableDiffusionProcessing, images: list, seed: int, info: str):
@@ -139,7 +144,7 @@ def fix_seed(p: StableDiffusionProcessing):
     pass
 
 
-def sample(model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent, denoise, custom_sampler, custom_sigmas):
+def sample(context: execution_context.ExecutionContext, model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent, denoise, custom_sampler, custom_sigmas):
     # Choose way to sample based on given inputs
 
     # Custom sampler and sigmas
@@ -159,7 +164,7 @@ def sample(model, seed, steps, cfg, sampler_name, scheduler, positive, negative,
         return samples
 
     # Default
-    (samples,) = common_ksampler(model, seed, steps, cfg, sampler_name,
+    (samples,) = common_ksampler(context, model, seed, steps, cfg, sampler_name,
                                  scheduler, positive, negative, latent, denoise=denoise)
     return samples
 
@@ -227,7 +232,7 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     (latent,) = p.vae_encoder.encode(p.vae, batched_tiles)
 
     # Generate samples
-    samples = sample(p.model, p.seed, p.steps, p.cfg, p.sampler_name, p.scheduler, positive_cropped,
+    samples = sample(p.context, p.model, p.seed, p.steps, p.cfg, p.sampler_name, p.scheduler, positive_cropped,
                      negative_cropped, latent, p.denoise, p.custom_sampler, p.custom_sigmas)
 
     # Update the progress bar
